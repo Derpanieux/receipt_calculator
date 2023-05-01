@@ -9,9 +9,37 @@ pub struct Receipt {
 }
 
 #[derive(Clone)]
-struct Person {
+pub struct Person {
     name: String,
     items: Vec<Item>,
+}
+impl Person{
+    pub fn new() -> Self {
+        return Self::new_with_name("".to_string());
+    }
+    pub fn new_with_name(name: String) -> Self {
+        return Self {
+            name,
+            items: Vec::new()
+        }
+    }
+    fn total(&self) -> Cost {
+        let mut tot = Cost(0.0);
+        for item in self.items.iter() {
+            tot += item.cost_per_person(self);
+        }
+        return tot;
+    }
+    pub fn to_string(&self) -> String{
+        let mut str = String::new();
+        str += &self.name;
+        str += "\n";
+        for i in self.items.iter() {
+            str += &i.name;
+            str += ", ";
+        }
+        return str;
+    }
 }
 impl PartialEq for Person {
     fn eq(&self, other: &Self) -> bool {
@@ -25,8 +53,8 @@ impl Hash for Person {
     }
 }
 
-
-struct Item {
+#[derive(Clone)]
+pub struct Item {
     name: String,
     cost: Cost,
     shares: HashMap<Person, f64>,
@@ -34,13 +62,31 @@ struct Item {
     tip_rate: f64,
 }
 impl Item {
-    fn total(&self) -> Cost{
+    pub fn new() -> Self {
+        return Self::new_with_all(String::new(), 0.0,1.0, 1.0);
+    }
+    pub fn new_with_name_cost(name: String, cost: f64) -> Self {
+        return Self::new_with_all(name, cost, 1.0, 1.0);
+    }
+    pub fn new_with_all(name: String, cost: f64, tax_rate: f64, tip_rate: f64) -> Self {
+        return Self {
+            name,
+            cost: Cost(cost),
+            shares: HashMap::new(),
+            tax_rate,
+            tip_rate
+        }
+    }
+    pub fn set_share(&mut self, p: &Person, s: &f64) {
+        self.shares.insert(p.clone(), s.clone());
+    }
+    pub fn total(&self) -> Cost{
         let multiplier = self.tax_rate * self.tip_rate;
         return self.cost.clone() * Cost(multiplier);
     }
     fn cost_per_share(&self) -> Cost {
         let total_shares:f64 = self.shares.values().sum();
-        return self.cost.clone() / Cost(total_shares);
+        return self.total() / Cost(total_shares);
     }
     fn cost_per_person(&self, p:&Person) -> Cost {
         let share = Cost(*self.shares.get(p).unwrap());
@@ -50,13 +96,33 @@ impl Item {
         let mut map = HashMap::new();
         let per_share = self.cost_per_share();
         for p in self.shares.iter() {
-            map.insert((p.0).clone(), per_share.clone() * Cost((p.1).clone()));
+            map.insert((*p.0).clone(), per_share.clone() * Cost(*p.1));
         }
         return map;
     }
+    fn to_string(&self) -> String{
+        let mut str = String::new();
+        str += "Item: ";
+        str += &self.name;
+        str += " ";
+        str += &self.cost.to_string();
+        str += "\n";
+        for i in self.shares.iter() {
+            str += &i.0.name;
+            str += "(";
+            str += &i.1.to_string();
+            str += "), ";
+        }
+        return str;
+    }
+}
+impl fmt::Display for Item {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return write!(f, "{}", self.to_string());
+    }
 }
 
-pub struct Cost (f64);
+struct Cost (f64);
 impl Cost {
     fn to_string(&self) -> String{
         let mut str = String::new();
@@ -82,6 +148,11 @@ impl Add for Cost {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         return Self(self.0 + other.0);
+    }
+}
+impl AddAssign for Cost {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
     }
 }
 impl Sub for Cost {
